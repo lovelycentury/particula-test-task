@@ -24,3 +24,20 @@ Besides the Vite + Vue scaffold, the project adds:
 | `vitest` (dev)                | Unit tests for `src/utils`.                                                |
 | `jsdom`, `@types/jsdom` (dev) | Browser-like DOM for tests; DOMPurify needs it.                            |
 | `sass-embedded` (dev)         | Compiles the design system's `.scss` styles.                               |
+
+## Assumptions
+
+- **Any two versions can be compared.** The default is oldest vs. latest. Readers usually
+  compare the version they last read with the next one, so picking the older version is
+  kept easy.
+- **Content is matched by `id`.** Ids are unique within a version and stable across
+  versions. If an id changes, it counts as a removal plus an addition; similar content is
+  not detected.
+- **Every content change is shown, even small ones.** Whitespace-only changes are ignored,
+  since readers don't care about them.
+- **Values are compared as plain text.** Field values like dates and numbers are strings
+  and are not parsed.
+- **Draft clauses are shown to readers.** A draft is part of the document, so it is
+  rendered and clearly marked as a draft, so it can't be mistaken for a final clause.
+  In the change summary a draft clause counts as one change, however much content it
+  holds.
