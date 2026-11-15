@@ -206,7 +206,7 @@ const countOwnChange = (node: { diffStatus: DiffStatus }) => {
  * Any other clause counts once if it changed itself, plus each changed child.
  */
 const countClauseChanges = (clause: ClauseDiff) => {
-  if (clause.status === 'draft') return 1
+  if (clause.status === 'draft' && clause.hasChanges) return 1
 
   return countOwnChange(clause) + clause.children.filter(isChanged).length
 }
