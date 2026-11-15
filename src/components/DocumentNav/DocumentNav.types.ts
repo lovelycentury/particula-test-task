@@ -1,4 +1,4 @@
-export interface DocumentNavItem {
+export type DocumentNavItem = {
   /** Id of the section the item links to. */
   id: string
   title: string

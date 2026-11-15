@@ -18,6 +18,7 @@ This project uses the Okkly design system (`@okkly/design-system` + `@okkly/vue`
 
 # Code style
 
+- Use `type` aliases, not `interface`; compose with `&` instead of `extends`.
 - Use arrow functions only (`const fn = () => {}`); no `function` declarations or expressions.
 - Split logic into small single-purpose functions with descriptive names; declare helpers before the code that uses them.
 - Use early returns (`if (...) return ...`) instead of ternaries in script logic; ternaries are fine in templates. Separate each early return from the next statement with a blank line.
