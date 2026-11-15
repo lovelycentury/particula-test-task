@@ -1,48 +1,26 @@
-# .
+## Setup
 
-This template should help get you started developing with Vue 3 in Vite.
-
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+The project uses [pnpm](https://pnpm.io/).
 
 ```sh
 pnpm install
+pnpm dev          # start dev server
+pnpm build        # type-check and build for production
+pnpm test:unit    # run unit tests
+pnpm lint         # lint with oxlint and ESLint
 ```
 
-### Compile and Hot-Reload for Development
+## Dependencies
 
-```sh
-pnpm dev
-```
+Besides the Vite + Vue scaffold, the project adds:
 
-### Type-Check, Compile and Minify for Production
-
-```sh
-pnpm build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-pnpm lint
-```
+| Package                       | Why                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------- |
+| `@okkly/design-system`        | My own library: design tokens (`--okkly-*` CSS variables) and base styles. |
+| `@okkly/vue`                  | My own library: ready-made Vue components built on those tokens.           |
+| `@fontsource/inter`           | Self-hosted sans font of the design system.                                |
+| `@fontsource/jetbrains-mono`  | Self-hosted mono font of the design system.                                |
+| `dompurify`                   | Sanitizes HTML from documents to prevent XSS.                              |
+| `vitest` (dev)                | Unit tests for `src/utils`.                                                |
+| `jsdom`, `@types/jsdom` (dev) | Browser-like DOM for tests; DOMPurify needs it.                            |
+| `sass-embedded` (dev)         | Compiles the design system's `.scss` styles.                               |
