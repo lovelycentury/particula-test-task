@@ -10,6 +10,17 @@ pnpm test:unit    # run unit tests
 pnpm lint         # lint with oxlint and ESLint
 ```
 
+### Docker
+
+Build the image and run it. The site is served by nginx on port 80 inside the container.
+
+```sh
+docker build -t particula-test-task .
+docker run -d --restart unless-stopped -p 80:80 particula-test-task
+```
+
+Then open `http://<server-ip>/`.
+
 ## Dependencies
 
 Besides the Vite + Vue scaffold, the project adds:
