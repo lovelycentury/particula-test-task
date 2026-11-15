@@ -2,10 +2,10 @@
 import { computed, ref } from 'vue'
 import { DocumentDiffLayout } from '@/components/DocumentDiffLayout'
 import { DocumentNav } from '@/components/DocumentNav'
-import type { DocumentNavItem } from '@/components/DocumentNav'
 import { VersionPicker } from '@/components/VersionPicker'
 import { documentVersions } from '@/data/document'
-import type { SectionNode } from '@/types/document'
+import { buildNavItems } from '@/utils/buildNavItems'
+import { diffDocument } from '@/utils/diffDocument'
 
 const firstVersion = documentVersions.at(0)
 const lastVersion = documentVersions.at(-1)
@@ -17,12 +17,20 @@ const toVersion = ref(lastVersion?.version ?? 0)
 const findVersion = (version: number) =>
   documentVersions.find((documentVersion) => documentVersion.version === version)
 
-const toNavItem = (section: SectionNode): DocumentNavItem => ({
-  id: section.id,
-  title: section.title,
+const diff = computed(() => {
+  const from = findVersion(fromVersion.value)
+  const to = findVersion(toVersion.value)
+
+  if (!from || !to) return undefined
+
+  return diffDocument(from, to)
 })
 
-const navItems = computed(() => findVersion(toVersion.value)?.children.map(toNavItem) ?? [])
+const navItems = computed(() => {
+  if (!diff.value) return []
+
+  return buildNavItems(diff.value)
+})
 </script>
 
 <template>
