@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import type { ClauseNode, DocumentVersion, FieldNode, ParagraphNode } from '@/types/document'
+import type {
+  ClauseNode,
+  DocumentVersion,
+  FieldNode,
+  ParagraphNode,
+  SectionNode,
+} from '@/types/document'
 import {
   addRemovedChildren,
   diffClause,
   diffField,
   diffParagraph,
+  diffSection,
   indexNodes,
   isSameText,
 } from '../diffDocument'
@@ -292,5 +299,89 @@ describe('diffClause', () => {
     const result = diffClause(clause, indexClause({ ...clause, children: [removed] }))
 
     expect(result.children[0]).toEqual({ ...removed, text: 'Old', diffStatus: 'removed' })
+  })
+})
+
+describe('diffSection', () => {
+  const paragraph: ParagraphNode = { id: 'p-1', type: 'paragraph', text: 'Text' }
+  const clause: ClauseNode = { id: 'cl-1', type: 'clause', title: 'Leave', children: [paragraph] }
+  const nested: SectionNode = { id: 'sec-1', type: 'section', title: 'Nested', children: [clause] }
+  const section: SectionNode = { id: 'sec', type: 'section', title: 'Benefits', children: [nested] }
+
+  const indexSection = (old: SectionNode) => indexNodes({ ...version, children: [old] })
+
+  it('marks a section missing from the old version as added, with everything inside', () => {
+    const result = diffSection(section, indexSection({ ...section, id: 'sec-other', children: [] }))
+
+    expect(result.diffStatus).toBe('added')
+    expect(result.hasChanges).toBe(true)
+    expect(result.children[0]?.diffStatus).toBe('added')
+  })
+
+  it('marks an identical section as unchanged without changes inside', () => {
+    const result = diffSection(section, indexSection(section))
+
+    expect(result.diffStatus).toBe('unchanged')
+    expect(result.previous).toBeUndefined()
+    expect(result.hasChanges).toBe(false)
+  })
+
+  it('ignores whitespace-only title changes', () => {
+    const result = diffSection(section, indexSection({ ...section, title: ' Benefits ' }))
+
+    expect(result.diffStatus).toBe('unchanged')
+  })
+
+  it('keeps the old title of a renamed section', () => {
+    const result = diffSection(section, indexSection({ ...section, title: 'Perks' }))
+
+    expect(result.diffStatus).toBe('changed')
+    expect(result.previous).toEqual({ title: 'Perks' })
+  })
+
+  it('flags a change deep inside without changing the section status', () => {
+    const oldClause: ClauseNode = { ...clause, children: [{ ...paragraph, text: 'Old' }] }
+    const old: SectionNode = { ...section, children: [{ ...nested, children: [oldClause] }] }
+    const result = diffSection(section, indexSection(old))
+
+    expect(result.diffStatus).toBe('unchanged')
+    expect(result.hasChanges).toBe(true)
+    expect(result.children[0]?.diffStatus).toBe('unchanged')
+    expect(result.children[0]?.hasChanges).toBe(true)
+  })
+
+  it('puts a removed clause back with all its children removed', () => {
+    const removed: ClauseNode = {
+      id: 'cl-old',
+      type: 'clause',
+      title: 'Old',
+      children: [{ id: 'p-old', type: 'paragraph', text: 'Old' }],
+    }
+    const result = diffSection(section, indexSection({ ...section, children: [removed, nested] }))
+
+    expect(result.hasChanges).toBe(true)
+    expect(result.children[0]).toEqual({
+      ...removed,
+      diffStatus: 'removed',
+      hasChanges: true,
+      children: [{ id: 'p-old', type: 'paragraph', text: 'Old', diffStatus: 'removed' }],
+    })
+    expect(result.children[1]?.id).toBe('sec-1')
+  })
+
+  it('puts a removed nested section back with everything inside removed', () => {
+    const removed: SectionNode = {
+      id: 'sec-old',
+      type: 'section',
+      title: 'Old',
+      children: [{ ...clause, id: 'cl-old', children: [] }],
+    }
+    const result = diffSection(section, indexSection({ ...section, children: [nested, removed] }))
+    const removedDiff = result.children[1]
+
+    expect(removedDiff?.diffStatus).toBe('removed')
+    expect(removedDiff?.children.map((child) => [child.id, child.diffStatus])).toEqual([
+      ['cl-old', 'removed'],
+    ])
   })
 })

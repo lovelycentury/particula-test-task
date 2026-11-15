@@ -4,6 +4,8 @@ import type {
   DiffStatus,
   FieldDiff,
   ParagraphDiff,
+  SectionChildDiff,
+  SectionDiff,
 } from '@/types/diff'
 import type {
   ClauseChild,
@@ -12,6 +14,7 @@ import type {
   DocumentVersion,
   FieldNode,
   ParagraphNode,
+  SectionChild,
   SectionNode,
 } from '@/types/document'
 import { sanitizeHtml } from './sanitizeHtml'
@@ -166,7 +169,8 @@ const getClausePrevious = (node: ClauseNode, old: ClauseNode): ClausePrevious =>
   return previous
 }
 
-const getClauseStatus = (previous: ClausePrevious, old?: ClauseNode): DiffStatus => {
+/** Status of a node's own fields, given the old values that changed (`previous`). */
+const getDiffStatus = (previous: object, old?: DocumentNode): DiffStatus => {
   if (!old) return 'added'
 
   if (isEmpty(previous)) return 'unchanged'
@@ -180,7 +184,7 @@ const getClauseStatus = (previous: ClausePrevious, old?: ClauseNode): DiffStatus
 export const diffClause = (node: ClauseNode, oldIndex: NodeIndex): ClauseDiff => {
   const old = findOld(oldIndex, node)
   const previous = old ? getClausePrevious(node, old) : {}
-  const diffStatus = getClauseStatus(previous, old)
+  const diffStatus = getDiffStatus(previous, old)
   const currentChildren = node.children.map((child) => diffClauseChild(child, oldIndex))
   const children = addRemovedChildren(currentChildren, old?.children ?? [], removedClauseChild)
   const hasChanges = diffStatus !== 'unchanged' || children.some(isChanged)
@@ -188,4 +192,64 @@ export const diffClause = (node: ClauseNode, oldIndex: NodeIndex): ClauseDiff =>
   if (diffStatus !== 'changed') return { ...node, diffStatus, children, hasChanges }
 
   return { ...node, diffStatus, previous, children, hasChanges }
+}
+
+const removedClause = (node: ClauseNode): ClauseDiff => ({
+  ...node,
+  diffStatus: 'removed',
+  children: node.children.map(removedClauseChild),
+  hasChanges: true,
+})
+
+/** A removed section is shown whole: everything inside it is removed too. */
+const removedSection = (node: SectionNode): SectionDiff => ({
+  ...node,
+  diffStatus: 'removed',
+  children: node.children.map((child) => removedSectionChild(child)),
+  hasChanges: true,
+  // TODO: count changes in the next step.
+  changeCount: 0,
+})
+
+/** Sections and clauses nest each other, so this and `removedSection` call one another. */
+const removedSectionChild = (child: SectionChild): SectionChildDiff => {
+  if (child.type === 'section') return removedSection(child)
+
+  return removedClause(child)
+}
+
+type SectionPrevious = NonNullable<SectionDiff['previous']>
+
+const getSectionPrevious = (node: SectionNode, old: SectionNode): SectionPrevious => {
+  const previous: SectionPrevious = {}
+
+  if (!isSameText(node.title, old.title)) previous.title = old.title
+
+  return previous
+}
+
+/** Sections and clauses nest each other, so this and `diffSection` call one another. */
+const diffSectionChild = (child: SectionChild, oldIndex: NodeIndex): SectionChildDiff => {
+  if (child.type === 'section') return diffSection(child, oldIndex)
+
+  return diffClause(child, oldIndex)
+}
+
+/**
+ * `diffStatus` covers the section's own title; edits inside it only set `hasChanges`.
+ */
+export const diffSection = (node: SectionNode, oldIndex: NodeIndex): SectionDiff => {
+  const old = findOld(oldIndex, node)
+  const previous = old ? getSectionPrevious(node, old) : {}
+  const diffStatus = getDiffStatus(previous, old)
+  const currentChildren = node.children.map((child) => diffSectionChild(child, oldIndex))
+  const children = addRemovedChildren(currentChildren, old?.children ?? [], removedSectionChild)
+  // Children here are sections and clauses, which may have changes inside while unchanged themselves.
+  const hasChanges = diffStatus !== 'unchanged' || children.some((child) => child.hasChanges)
+  // TODO: count changes in the next step.
+  const changeCount = 0
+
+  if (diffStatus !== 'changed') return { ...node, diffStatus, children, hasChanges, changeCount }
+
+  return { ...node, diffStatus, previous, children, hasChanges, changeCount }
 }
