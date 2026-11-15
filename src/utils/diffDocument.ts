@@ -194,6 +194,40 @@ export const diffClause = (node: ClauseNode, oldIndex: NodeIndex): ClauseDiff =>
   return { ...node, diffStatus, previous, children, hasChanges }
 }
 
+const countOwnChange = (node: { diffStatus: DiffStatus }) => {
+  if (isChanged(node)) return 1
+
+  return 0
+}
+
+/** A clause counts once for itself: when it changed, or when it is a draft (it needs review). */
+const countClauseOwnChange = (clause: ClauseDiff) => {
+  if (clause.status === 'draft') return 1
+
+  return countOwnChange(clause)
+}
+
+const countClauseChanges = (clause: ClauseDiff) =>
+  countClauseOwnChange(clause) + clause.children.filter(isChanged).length
+
+const countSectionChildChanges = (child: SectionChildDiff) => {
+  if (child.type === 'clause') return countClauseChanges(child)
+
+  return countOwnChange(child) + child.changeCount
+}
+
+/**
+ * Changes inside a section, for the sidebar: every added, removed or changed node counts,
+ * including everything inside an added or removed one, and every draft clause counts once.
+ */
+const countSectionChanges = (children: SectionChildDiff[]) => {
+  let count = 0
+
+  for (const child of children) count += countSectionChildChanges(child)
+
+  return count
+}
+
 const removedClause = (node: ClauseNode): ClauseDiff => ({
   ...node,
   diffStatus: 'removed',
@@ -202,14 +236,17 @@ const removedClause = (node: ClauseNode): ClauseDiff => ({
 })
 
 /** A removed section is shown whole: everything inside it is removed too. */
-const removedSection = (node: SectionNode): SectionDiff => ({
-  ...node,
-  diffStatus: 'removed',
-  children: node.children.map((child) => removedSectionChild(child)),
-  hasChanges: true,
-  // TODO: count changes in the next step.
-  changeCount: 0,
-})
+const removedSection = (node: SectionNode): SectionDiff => {
+  const children = node.children.map((child) => removedSectionChild(child))
+
+  return {
+    ...node,
+    diffStatus: 'removed',
+    children,
+    hasChanges: true,
+    changeCount: countSectionChanges(children),
+  }
+}
 
 /** Sections and clauses nest each other, so this and `removedSection` call one another. */
 const removedSectionChild = (child: SectionChild): SectionChildDiff => {
@@ -246,8 +283,7 @@ export const diffSection = (node: SectionNode, oldIndex: NodeIndex): SectionDiff
   const children = addRemovedChildren(currentChildren, old?.children ?? [], removedSectionChild)
   // Children here are sections and clauses, which may have changes inside while unchanged themselves.
   const hasChanges = diffStatus !== 'unchanged' || children.some((child) => child.hasChanges)
-  // TODO: count changes in the next step.
-  const changeCount = 0
+  const changeCount = countSectionChanges(children)
 
   if (diffStatus !== 'changed') return { ...node, diffStatus, children, hasChanges, changeCount }
 

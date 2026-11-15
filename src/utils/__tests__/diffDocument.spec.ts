@@ -384,4 +384,85 @@ describe('diffSection', () => {
       ['cl-old', 'removed'],
     ])
   })
+
+  describe('changeCount', () => {
+    it('is zero when nothing changed', () => {
+      expect(diffSection(section, indexSection(section)).changeCount).toBe(0)
+    })
+
+    it('counts a change deep inside in every section above it', () => {
+      const oldClause: ClauseNode = { ...clause, children: [{ ...paragraph, text: 'Old' }] }
+      const old: SectionNode = { ...section, children: [{ ...nested, children: [oldClause] }] }
+      const result = diffSection(section, indexSection(old))
+
+      expect(result.changeCount).toBe(1)
+      expect(result.children[0]?.changeCount).toBe(1)
+    })
+
+    it('counts a renamed nested section in its parent only', () => {
+      const old: SectionNode = { ...section, children: [{ ...nested, title: 'Old' }] }
+      const result = diffSection(section, indexSection(old))
+
+      expect(result.changeCount).toBe(1)
+      expect(result.children[0]?.changeCount).toBe(0)
+    })
+
+    it('counts an unchanged draft clause once', () => {
+      const draft: SectionNode = { ...section, children: [{ ...clause, status: 'draft' }] }
+
+      expect(diffSection(draft, indexSection(draft)).changeCount).toBe(1)
+    })
+
+    it('counts a renamed draft clause once', () => {
+      const draft: SectionNode = { ...section, children: [{ ...clause, status: 'draft' }] }
+      const old: SectionNode = {
+        ...section,
+        children: [{ ...clause, status: 'draft', title: 'Old' }],
+      }
+
+      expect(diffSection(draft, indexSection(old)).changeCount).toBe(1)
+    })
+
+    it('counts an added clause together with everything inside', () => {
+      const added: ClauseNode = {
+        id: 'cl-new',
+        type: 'clause',
+        title: 'New',
+        children: [
+          { id: 'p-a', type: 'paragraph', text: 'A' },
+          { id: 'p-b', type: 'paragraph', text: 'B' },
+          { id: 'f-c', type: 'field', label: 'C', value: 'c' },
+        ],
+      }
+      const current: SectionNode = { ...section, children: [nested, added] }
+
+      expect(diffSection(current, indexSection(section)).changeCount).toBe(4)
+    })
+
+    it('counts a removed section together with everything inside', () => {
+      const removed: SectionNode = {
+        id: 'sec-old',
+        type: 'section',
+        title: 'Old',
+        children: [
+          {
+            id: 'cl-a',
+            type: 'clause',
+            title: 'A',
+            children: [{ id: 'p-a', type: 'paragraph', text: 'A' }],
+          },
+          {
+            id: 'cl-b',
+            type: 'clause',
+            title: 'B',
+            children: [{ id: 'p-b', type: 'paragraph', text: 'B' }],
+          },
+        ],
+      }
+      const result = diffSection(section, indexSection({ ...section, children: [nested, removed] }))
+
+      expect(result.children[1]?.changeCount).toBe(4)
+      expect(result.changeCount).toBe(5)
+    })
+  })
 })
