@@ -113,6 +113,47 @@ const diffClauseChild = (child: ClauseChild, oldIndex: NodeIndex): ClauseChildDi
   return diffField(child, findOld(oldIndex, child))
 }
 
+/** Removed paragraphs are rendered too, so their text is sanitized like current ones. */
+const removedClauseChild = (child: ClauseChild): ClauseChildDiff => {
+  if (child.type === 'paragraph') {
+    return { ...child, text: sanitizeHtml(child.text), diffStatus: 'removed' }
+  }
+
+  return { ...child, diffStatus: 'removed' }
+}
+
+const indexOfId = (nodes: { id: string }[], id: string) => nodes.findIndex((node) => node.id === id)
+
+/**
+ * Puts old children that are no longer in this parent back among the current ones,
+ * each right after the old sibling it used to follow.
+ *
+ * Example: old `[A, B, C]`, current `[A, C, D]` → `[A, B (removed), C, D]`.
+ */
+export const addRemovedChildren = <TDiff extends { id: string }, TNode extends { id: string }>(
+  currentChildren: TDiff[],
+  oldChildren: TNode[],
+  toRemoved: (node: TNode) => TDiff,
+): TDiff[] => {
+  const merged = [...currentChildren]
+  // Where the next removed child goes: right after the previous old sibling.
+  let insertIndex = 0
+
+  for (const oldChild of oldChildren) {
+    const currentIndex = indexOfId(merged, oldChild.id)
+
+    if (currentIndex !== -1) {
+      insertIndex = currentIndex + 1
+      continue
+    }
+
+    merged.splice(insertIndex, 0, toRemoved(oldChild))
+    insertIndex += 1
+  }
+
+  return merged
+}
+
 type ClausePrevious = NonNullable<ClauseDiff['previous']>
 
 /** Old title and draft status, when they changed; `status: null` means the clause was final. */
@@ -140,7 +181,8 @@ export const diffClause = (node: ClauseNode, oldIndex: NodeIndex): ClauseDiff =>
   const old = findOld(oldIndex, node)
   const previous = old ? getClausePrevious(node, old) : {}
   const diffStatus = getClauseStatus(previous, old)
-  const children = node.children.map((child) => diffClauseChild(child, oldIndex))
+  const currentChildren = node.children.map((child) => diffClauseChild(child, oldIndex))
+  const children = addRemovedChildren(currentChildren, old?.children ?? [], removedClauseChild)
   const hasChanges = diffStatus !== 'unchanged' || children.some(isChanged)
 
   if (diffStatus !== 'changed') return { ...node, diffStatus, children, hasChanges }

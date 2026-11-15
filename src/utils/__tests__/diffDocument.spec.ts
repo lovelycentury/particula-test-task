@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { ClauseNode, DocumentVersion, FieldNode, ParagraphNode } from '@/types/document'
-import { diffClause, diffField, diffParagraph, indexNodes, isSameText } from '../diffDocument'
+import {
+  addRemovedChildren,
+  diffClause,
+  diffField,
+  diffParagraph,
+  indexNodes,
+  isSameText,
+} from '../diffDocument'
 
 const version: DocumentVersion = {
   id: 'doc',
@@ -144,6 +151,44 @@ describe('diffField', () => {
   })
 })
 
+describe('addRemovedChildren', () => {
+  const toRemoved = (node: { id: string }) => ({ id: node.id, removed: true })
+  const current = (...ids: string[]) => ids.map((id) => ({ id, removed: false }))
+  const old = (...ids: string[]) => ids.map((id) => ({ id }))
+  const summarize = (nodes: { id: string; removed: boolean }[]) =>
+    nodes.map((node) => (node.removed ? `-${node.id}` : node.id))
+
+  it('puts a removed child right after its old previous sibling', () => {
+    const result = addRemovedChildren(current('A', 'C', 'D'), old('A', 'B', 'C'), toRemoved)
+
+    expect(summarize(result)).toEqual(['A', '-B', 'C', 'D'])
+  })
+
+  it('puts a removed first child at the start', () => {
+    const result = addRemovedChildren(current('B'), old('A', 'B'), toRemoved)
+
+    expect(summarize(result)).toEqual(['-A', 'B'])
+  })
+
+  it('keeps consecutive removed children in their old order', () => {
+    const result = addRemovedChildren(current('A', 'D'), old('A', 'B', 'C', 'D'), toRemoved)
+
+    expect(summarize(result)).toEqual(['A', '-B', '-C', 'D'])
+  })
+
+  it('returns only removed children when nothing is left', () => {
+    const result = addRemovedChildren([], old('A', 'B'), toRemoved)
+
+    expect(summarize(result)).toEqual(['-A', '-B'])
+  })
+
+  it('leaves current children as they are when nothing was removed', () => {
+    const result = addRemovedChildren(current('B', 'A'), old('A', 'B'), toRemoved)
+
+    expect(summarize(result)).toEqual(['B', 'A'])
+  })
+})
+
 describe('diffClause', () => {
   const paragraph: ParagraphNode = { id: 'p-1', type: 'paragraph', text: 'Text' }
   const field: FieldNode = { id: 'f-1', type: 'field', label: 'Days', value: '27' }
@@ -222,5 +267,30 @@ describe('diffClause', () => {
       diffStatus: 'changed',
       previous: { value: '25' },
     })
+  })
+
+  it('puts a removed child back at its old place', () => {
+    const removed: ParagraphNode = { id: 'p-old', type: 'paragraph', text: 'Old' }
+    const old: ClauseNode = { ...clause, children: [field, removed, paragraph] }
+    const result = diffClause(clause, indexClause(old))
+
+    expect(result.diffStatus).toBe('unchanged')
+    expect(result.hasChanges).toBe(true)
+    expect(result.children.map((child) => [child.id, child.diffStatus])).toEqual([
+      ['f-1', 'unchanged'],
+      ['p-old', 'removed'],
+      ['p-1', 'unchanged'],
+    ])
+  })
+
+  it('sanitizes the text of a removed paragraph', () => {
+    const removed: ParagraphNode = {
+      id: 'p-old',
+      type: 'paragraph',
+      text: '<img src="x" onerror="alert(1)">Old',
+    }
+    const result = diffClause(clause, indexClause({ ...clause, children: [removed] }))
+
+    expect(result.children[0]).toEqual({ ...removed, text: 'Old', diffStatus: 'removed' })
   })
 })
