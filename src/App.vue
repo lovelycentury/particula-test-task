@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { DocumentDiff } from '@/components/DocumentDiff'
 import { DocumentDiffLayout } from '@/components/DocumentDiffLayout'
 import { DocumentNav } from '@/components/DocumentNav'
 import { VersionPicker } from '@/components/VersionPicker'
@@ -46,5 +47,7 @@ const navItems = computed(() => {
     <template #sidebar>
       <DocumentNav :items="navItems" />
     </template>
+
+    <DocumentDiff v-if="diff" :diff="diff" />
   </DocumentDiffLayout>
 </template>
