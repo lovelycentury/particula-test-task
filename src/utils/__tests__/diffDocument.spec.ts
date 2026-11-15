@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { DocumentVersion } from '@/types/document'
-import { indexNodes } from '../diffDocument'
+import type { ClauseNode, DocumentVersion, FieldNode, ParagraphNode } from '@/types/document'
+import { diffClause, diffField, diffParagraph, indexNodes, isSameText } from '../diffDocument'
 
 const version: DocumentVersion = {
   id: 'doc',
@@ -50,5 +50,177 @@ describe('indexNodes', () => {
     expect(index.get('cl-1')?.parent?.id).toBe('sec-a-1')
     expect(index.get('p-1')?.parent?.id).toBe('cl-1')
     expect(index.get('f-1')?.parent?.id).toBe('cl-1')
+  })
+})
+
+describe('isSameText', () => {
+  it('ignores whitespace-only differences', () => {
+    expect(isSameText('  Core   hours\nstart ', 'Core hours start')).toBe(true)
+  })
+
+  it('detects real text changes', () => {
+    expect(isSameText('25 days', '27 days')).toBe(false)
+  })
+})
+
+describe('diffParagraph', () => {
+  const paragraph: ParagraphNode = { id: 'p-1', type: 'paragraph', text: 'New text' }
+
+  it('marks a paragraph without an old version as added', () => {
+    expect(diffParagraph(paragraph)).toEqual({ ...paragraph, diffStatus: 'added' })
+  })
+
+  it('marks a paragraph with the same text as unchanged', () => {
+    const old: ParagraphNode = { ...paragraph, text: ' New  text ' }
+
+    expect(diffParagraph(paragraph, old)).toEqual({ ...paragraph, diffStatus: 'unchanged' })
+  })
+
+  it('keeps the old text of a changed paragraph', () => {
+    const old: ParagraphNode = { ...paragraph, text: 'Old text' }
+
+    expect(diffParagraph(paragraph, old)).toEqual({
+      ...paragraph,
+      diffStatus: 'changed',
+      previous: { text: 'Old text' },
+    })
+  })
+
+  it('sanitizes the text of both versions', () => {
+    const current: ParagraphNode = { ...paragraph, text: 'New <b>text</b><img src="x">' }
+    const old: ParagraphNode = { ...paragraph, text: 'Old<script>alert(1)</script>' }
+
+    expect(diffParagraph(current, old)).toEqual({
+      ...paragraph,
+      text: 'New <b>text</b>',
+      diffStatus: 'changed',
+      previous: { text: 'Old' },
+    })
+  })
+
+  it('ignores changes the reader cannot see', () => {
+    const current: ParagraphNode = {
+      ...paragraph,
+      text: 'New text<img src="x" onerror="alert(1)">',
+    }
+
+    expect(diffParagraph(current, paragraph)).toEqual({ ...paragraph, diffStatus: 'unchanged' })
+  })
+})
+
+describe('diffField', () => {
+  const field: FieldNode = { id: 'f-1', type: 'field', label: 'Days per year', value: '27' }
+
+  it('marks a field without an old version as added', () => {
+    expect(diffField(field)).toEqual({ ...field, diffStatus: 'added' })
+  })
+
+  it('marks a field with the same label and value as unchanged', () => {
+    expect(diffField(field, { ...field })).toEqual({ ...field, diffStatus: 'unchanged' })
+  })
+
+  it('keeps only the old value when just the value changed', () => {
+    expect(diffField(field, { ...field, value: '25' })).toEqual({
+      ...field,
+      diffStatus: 'changed',
+      previous: { value: '25' },
+    })
+  })
+
+  it('keeps only the old label when just the label changed', () => {
+    expect(diffField(field, { ...field, label: 'Days' })).toEqual({
+      ...field,
+      diffStatus: 'changed',
+      previous: { label: 'Days' },
+    })
+  })
+
+  it('keeps both when label and value changed', () => {
+    expect(diffField(field, { ...field, label: 'Days', value: '25' })).toEqual({
+      ...field,
+      diffStatus: 'changed',
+      previous: { label: 'Days', value: '25' },
+    })
+  })
+})
+
+describe('diffClause', () => {
+  const paragraph: ParagraphNode = { id: 'p-1', type: 'paragraph', text: 'Text' }
+  const field: FieldNode = { id: 'f-1', type: 'field', label: 'Days', value: '27' }
+  const clause: ClauseNode = {
+    id: 'cl-1',
+    type: 'clause',
+    title: 'Annual leave',
+    children: [field, paragraph],
+  }
+
+  /** Index of an old version holding just the given clause. */
+  const indexClause = (old: ClauseNode) =>
+    indexNodes({
+      ...version,
+      children: [{ id: 'sec-a', type: 'section', title: 'A', children: [old] }],
+    })
+
+  it('marks a clause missing from the old version as added, with all its children', () => {
+    const result = diffClause(clause, indexClause({ ...clause, id: 'cl-other', children: [] }))
+
+    expect(result.diffStatus).toBe('added')
+    expect(result.previous).toBeUndefined()
+    expect(result.hasChanges).toBe(true)
+    expect(result.children.map((child) => child.diffStatus)).toEqual(['added', 'added'])
+  })
+
+  it('marks an identical clause as unchanged without changes inside', () => {
+    const result = diffClause(clause, indexClause(clause))
+
+    expect(result.diffStatus).toBe('unchanged')
+    expect(result.hasChanges).toBe(false)
+    expect(result.children.map((child) => child.diffStatus)).toEqual(['unchanged', 'unchanged'])
+  })
+
+  it('ignores whitespace-only title changes', () => {
+    const result = diffClause(clause, indexClause({ ...clause, title: ' Annual  leave ' }))
+
+    expect(result.diffStatus).toBe('unchanged')
+  })
+
+  it('keeps the old title of a renamed clause', () => {
+    const result = diffClause(clause, indexClause({ ...clause, title: 'Holidays' }))
+
+    expect(result.diffStatus).toBe('changed')
+    expect(result.previous).toEqual({ title: 'Holidays' })
+  })
+
+  it('records a clause that became a draft as previously final', () => {
+    const result = diffClause({ ...clause, status: 'draft' }, indexClause(clause))
+
+    expect(result.diffStatus).toBe('changed')
+    expect(result.previous).toEqual({ status: null })
+  })
+
+  it('records a draft that became final', () => {
+    const result = diffClause(clause, indexClause({ ...clause, status: 'draft' }))
+
+    expect(result.diffStatus).toBe('changed')
+    expect(result.previous).toEqual({ status: 'draft' })
+  })
+
+  it('keeps a still-draft clause unchanged', () => {
+    const draft: ClauseNode = { ...clause, status: 'draft' }
+
+    expect(diffClause(draft, indexClause(draft)).diffStatus).toBe('unchanged')
+  })
+
+  it('flags changes inside the clause without changing its own status', () => {
+    const old: ClauseNode = { ...clause, children: [{ ...field, value: '25' }, paragraph] }
+    const result = diffClause(clause, indexClause(old))
+
+    expect(result.diffStatus).toBe('unchanged')
+    expect(result.hasChanges).toBe(true)
+    expect(result.children[0]).toEqual({
+      ...field,
+      diffStatus: 'changed',
+      previous: { value: '25' },
+    })
   })
 })
