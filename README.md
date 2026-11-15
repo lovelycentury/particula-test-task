@@ -48,3 +48,8 @@ Besides the Vite + Vue scaffold, the project adds:
   it as removed at its old place and compares it by `id` at its new place, without saying
   where it came from or went to. The `movedFrom` / `movedTo` fields in `src/types/diff.ts`
   are reserved for this and are never set yet.
+- **Paragraph changes are not highlighted word by word.** A changed paragraph shows the
+  whole old text struck through above the whole new text, so small edits in long
+  paragraphs are harder to spot.
+- **Changes are shown only as struck-through old and underlined new values.** There are no
+  explanatory notes such as "renamed from …" or "was a draft in v1".

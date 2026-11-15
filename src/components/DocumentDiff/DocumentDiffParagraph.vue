@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Typography } from '@okkly/vue'
 import type { ParagraphDiff } from '@/types/diff'
+import DocumentDiffChange from './DocumentDiffChange.vue'
 import DocumentDiffMark from './DocumentDiffMark.vue'
 
 defineProps<{
@@ -11,8 +12,7 @@ defineProps<{
 <template>
   <DocumentDiffMark :status="paragraph.diffStatus">
     <Typography>
-      <!-- Safe: `diffDocument` sanitizes paragraph HTML before it gets here. -->
-      <span v-html="paragraph.text" />
+      <DocumentDiffChange :old="paragraph.previous?.text" :current="paragraph.text" html block />
     </Typography>
   </DocumentDiffMark>
 </template>
