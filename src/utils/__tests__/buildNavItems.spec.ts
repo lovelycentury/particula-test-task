@@ -23,9 +23,9 @@ const buildFor = (from: SectionNode[], to: SectionNode[]) =>
   buildNavItems(diffDocument(withSections(...from), withSections(...to)))
 
 describe('buildNavItems', () => {
-  it('builds one unmarked item without changes for an unchanged section', () => {
+  it('builds one item without changes for an unchanged section', () => {
     expect(buildFor([section], [section])).toEqual([
-      { id: 'sec', title: 'Section', changeCount: 0, marked: false },
+      { id: 'sec', title: 'Section', changeCount: 0 },
     ])
   })
 
@@ -46,19 +46,5 @@ describe('buildNavItems', () => {
     expect(items.map((item) => item.id)).toEqual(['sec', 'sec-2'])
     // The section, its clause and the clause's paragraph.
     expect(items[0]?.changeCount).toBe(3)
-  })
-
-  it('marks a section with a draft clause, even deep inside', () => {
-    const draft: ClauseNode = { ...clause, status: 'draft' }
-    const nested: SectionNode = { id: 'sec-1', type: 'section', title: 'Nested', children: [draft] }
-    const current: SectionNode = { ...section, children: [nested] }
-
-    expect(buildFor([current], [current])[0]?.marked).toBe(true)
-  })
-
-  it('does not mark a section whose draft clause was removed', () => {
-    const old: SectionNode = { ...section, children: [{ ...clause, status: 'draft' }] }
-
-    expect(buildFor([old], [{ ...section, children: [] }])[0]?.marked).toBe(false)
   })
 })

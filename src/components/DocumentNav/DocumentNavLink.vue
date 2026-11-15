@@ -2,16 +2,28 @@
 import { Box, Typography } from '@okkly/vue'
 import type { DocumentNavItem } from './DocumentNav.types'
 
-defineProps<{
+const props = defineProps<{
   item: DocumentNavItem
   active: boolean
 }>()
+
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+const scrollToSection = (event: MouseEvent) => {
+  const section = document.getElementById(props.item.id)
+  if (!section) return
+
+  event.preventDefault()
+  section.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' })
+  history.pushState(null, '', `#${props.item.id}`)
+}
 </script>
 
 <template>
   <Box
     as="a"
     :href="`#${item.id}`"
+    @click="scrollToSection"
     class="document-nav-link"
     :class="{ 'document-nav-link--active': active }"
     :aria-current="active ? 'location' : undefined"
@@ -23,10 +35,7 @@ defineProps<{
     :py="2"
     :border-radius="2"
   >
-    <Box display="flex" align-items="center" :gap="2" min-width="0">
-      <Typography no-wrap>{{ item.title }}</Typography>
-      <span v-if="item.marked" class="document-nav-link__marker" aria-label="Needs attention" />
-    </Box>
+    <Typography no-wrap>{{ item.title }}</Typography>
     <Typography v-if="item.changeCount" variant="label-sm" color="muted">
       {{ item.changeCount }}
     </Typography>
@@ -47,13 +56,5 @@ defineProps<{
 
 .document-nav-link:focus-visible {
   outline: var(--okkly-space-0-5) solid var(--okkly-accent-primary);
-}
-
-.document-nav-link__marker {
-  flex-shrink: 0;
-  width: var(--okkly-space-1-5);
-  height: var(--okkly-space-1-5);
-  border-radius: var(--okkly-radius-full);
-  background-color: var(--okkly-feedback-warning);
 }
 </style>

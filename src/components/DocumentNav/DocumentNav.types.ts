@@ -4,6 +4,4 @@ export type DocumentNavItem = {
   title: string
   /** Number shown on the right; hidden when absent or zero. */
   changeCount?: number
-  /** Shows a dot after the title to draw the reader's attention. */
-  marked?: boolean
 }
