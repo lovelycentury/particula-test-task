@@ -41,3 +41,10 @@ Besides the Vite + Vue scaffold, the project adds:
   rendered and clearly marked as a draft, so it can't be mistaken for a final clause.
   In the change summary a draft clause counts as one change, however much content it
   holds.
+
+## Not done
+
+- **Moves are not marked.** When a node moves to another section or clause, the diff shows
+  it as removed at its old place and compares it by `id` at its new place, without saying
+  where it came from or went to. The `movedFrom` / `movedTo` fields in `src/types/diff.ts`
+  are reserved for this and are never set yet.

@@ -2,6 +2,7 @@ import type {
   ClauseChildDiff,
   ClauseDiff,
   DiffStatus,
+  DocumentDiff,
   FieldDiff,
   ParagraphDiff,
   SectionChildDiff,
@@ -200,15 +201,15 @@ const countOwnChange = (node: { diffStatus: DiffStatus }) => {
   return 0
 }
 
-/** A clause counts once for itself: when it changed, or when it is a draft (it needs review). */
-const countClauseOwnChange = (clause: ClauseDiff) => {
+/**
+ * A draft clause counts as one change however much it holds: readers review it as a whole.
+ * Any other clause counts once if it changed itself, plus each changed child.
+ */
+const countClauseChanges = (clause: ClauseDiff) => {
   if (clause.status === 'draft') return 1
 
-  return countOwnChange(clause)
+  return countOwnChange(clause) + clause.children.filter(isChanged).length
 }
-
-const countClauseChanges = (clause: ClauseDiff) =>
-  countClauseOwnChange(clause) + clause.children.filter(isChanged).length
 
 const countSectionChildChanges = (child: SectionChildDiff) => {
   if (child.type === 'clause') return countClauseChanges(child)
@@ -218,7 +219,7 @@ const countSectionChildChanges = (child: SectionChildDiff) => {
 
 /**
  * Changes inside a section, for the sidebar: every added, removed or changed node counts,
- * including everything inside an added or removed one, and every draft clause counts once.
+ * including everything inside an added or removed one; a draft clause counts once.
  */
 const countSectionChanges = (children: SectionChildDiff[]) => {
   let count = 0
@@ -288,4 +289,17 @@ export const diffSection = (node: SectionNode, oldIndex: NodeIndex): SectionDiff
   if (diffStatus !== 'changed') return { ...node, diffStatus, children, hasChanges, changeCount }
 
   return { ...node, diffStatus, previous, children, hasChanges, changeCount }
+}
+
+/**
+ * Compares two versions of a document node by node, matching nodes by `id`.
+ * The result follows `to`, with nodes removed since `from` put back at their old place.
+ */
+export const diffDocument = (from: DocumentVersion, to: DocumentVersion): DocumentDiff => {
+  const oldIndex = indexNodes(from)
+  const currentSections = to.children.map((section) => diffSection(section, oldIndex))
+  const sections = addRemovedChildren(currentSections, from.children, removedSection)
+  const hasChanges = sections.some((section) => section.hasChanges)
+
+  return { from, to, sections, hasChanges }
 }

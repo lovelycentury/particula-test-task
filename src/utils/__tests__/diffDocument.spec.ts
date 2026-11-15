@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { documentVersions } from '@/data/document'
+import type { SectionDiff } from '@/types/diff'
 import type {
   ClauseNode,
   DocumentVersion,
@@ -9,6 +11,7 @@ import type {
 import {
   addRemovedChildren,
   diffClause,
+  diffDocument,
   diffField,
   diffParagraph,
   diffSection,
@@ -386,6 +389,14 @@ describe('diffSection', () => {
   })
 
   describe('changeCount', () => {
+    /** `changeCount` exists only on sections, so the child is checked to be one first. */
+    const childChangeCount = (result: SectionDiff, index: number) => {
+      const child = result.children[index]
+      if (child?.type !== 'section') throw new Error(`Expected a section at ${index}`)
+
+      return child.changeCount
+    }
+
     it('is zero when nothing changed', () => {
       expect(diffSection(section, indexSection(section)).changeCount).toBe(0)
     })
@@ -396,7 +407,7 @@ describe('diffSection', () => {
       const result = diffSection(section, indexSection(old))
 
       expect(result.changeCount).toBe(1)
-      expect(result.children[0]?.changeCount).toBe(1)
+      expect(childChangeCount(result, 0)).toBe(1)
     })
 
     it('counts a renamed nested section in its parent only', () => {
@@ -404,7 +415,7 @@ describe('diffSection', () => {
       const result = diffSection(section, indexSection(old))
 
       expect(result.changeCount).toBe(1)
-      expect(result.children[0]?.changeCount).toBe(0)
+      expect(childChangeCount(result, 0)).toBe(0)
     })
 
     it('counts an unchanged draft clause once', () => {
@@ -421,6 +432,21 @@ describe('diffSection', () => {
       }
 
       expect(diffSection(draft, indexSection(old)).changeCount).toBe(1)
+    })
+
+    it('counts a draft clause once however much changed inside', () => {
+      const draft: ClauseNode = {
+        ...clause,
+        status: 'draft',
+        children: [paragraph, { id: 'p-new', type: 'paragraph', text: 'New' }],
+      }
+      const current: SectionNode = { ...section, children: [draft] }
+      const old: SectionNode = {
+        ...section,
+        children: [{ ...clause, children: [{ ...paragraph, text: 'Old' }] }],
+      }
+
+      expect(diffSection(current, indexSection(old)).changeCount).toBe(1)
     })
 
     it('counts an added clause together with everything inside', () => {
@@ -461,8 +487,66 @@ describe('diffSection', () => {
       }
       const result = diffSection(section, indexSection({ ...section, children: [nested, removed] }))
 
-      expect(result.children[1]?.changeCount).toBe(4)
+      expect(childChangeCount(result, 1)).toBe(4)
       expect(result.changeCount).toBe(5)
     })
+  })
+})
+
+describe('diffDocument', () => {
+  const sectionA: SectionNode = { id: 'sec-a', type: 'section', title: 'A', children: [] }
+  const sectionB: SectionNode = { id: 'sec-b', type: 'section', title: 'B', children: [] }
+  const withSections = (...children: SectionNode[]): DocumentVersion => ({ ...version, children })
+
+  const summarize = (sections: { id: string; diffStatus: string }[]) =>
+    sections.map((section) => [section.id, section.diffStatus])
+
+  it('keeps both versions in the result', () => {
+    const from = withSections(sectionA)
+    const to = { ...withSections(sectionA), version: 2 }
+    const result = diffDocument(from, to)
+
+    expect(result.from).toBe(from)
+    expect(result.to).toBe(to)
+  })
+
+  it('reports no changes between identical versions', () => {
+    const result = diffDocument(version, version)
+
+    expect(result.hasChanges).toBe(false)
+    expect(result.sections.map((section) => section.diffStatus)).toEqual(['unchanged'])
+  })
+
+  it('marks a new top-level section as added', () => {
+    const result = diffDocument(withSections(sectionA), withSections(sectionA, sectionB))
+
+    expect(result.hasChanges).toBe(true)
+    expect(summarize(result.sections)).toEqual([
+      ['sec-a', 'unchanged'],
+      ['sec-b', 'added'],
+    ])
+  })
+
+  it('puts a removed top-level section back at its old place', () => {
+    const result = diffDocument(withSections(sectionA, sectionB), withSections(sectionB))
+
+    expect(result.hasChanges).toBe(true)
+    expect(summarize(result.sections)).toEqual([
+      ['sec-a', 'removed'],
+      ['sec-b', 'unchanged'],
+    ])
+  })
+
+  it('compares the real mock versions', () => {
+    const [v1, v2] = documentVersions
+    if (!v1 || !v2) throw new Error('Expected at least two mock versions')
+
+    const result = diffDocument(v1, v2)
+    const remote = result.sections.find((section) => section.id === 'sec-remote')
+
+    expect(result.hasChanges).toBe(true)
+    expect(result.sections).toHaveLength(8)
+    expect(remote?.diffStatus).toBe('added')
+    expect(remote?.changeCount).toBeGreaterThan(0)
   })
 })
