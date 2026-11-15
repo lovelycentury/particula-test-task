@@ -3,6 +3,7 @@ import { Badge, Box, Typography } from '@okkly/vue'
 import type { ClauseDiff } from '@/types/diff'
 import { headingTag } from '@/utils/headingTag'
 import DocumentDiffField from './DocumentDiffField.vue'
+import DocumentDiffMark from './DocumentDiffMark.vue'
 import DocumentDiffParagraph from './DocumentDiffParagraph.vue'
 
 defineProps<{
@@ -22,7 +23,9 @@ defineProps<{
     :gap="3"
   >
     <Box display="flex" align-items="center" :gap="3">
-      <Typography variant="label-md" :as="headingTag(level)">{{ clause.title }}</Typography>
+      <DocumentDiffMark :status="clause.diffStatus">
+        <Typography variant="label-md" :as="headingTag(level)">{{ clause.title }}</Typography>
+      </DocumentDiffMark>
       <Badge v-if="clause.status === 'draft'" color="warning" badge-content="Draft" />
     </Box>
 
