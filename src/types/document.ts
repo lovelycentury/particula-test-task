@@ -1,12 +1,12 @@
 /** Leaf: free-form text block. */
-export interface ParagraphNode {
+export type ParagraphNode = {
   id: string
   type: 'paragraph'
   text: string
 }
 
 /** Leaf: labeled key/value pair. */
-export interface FieldNode {
+export type FieldNode = {
   id: string
   type: 'field'
   label: string
@@ -16,7 +16,7 @@ export interface FieldNode {
 export type ClauseStatus = 'draft'
 
 /** Groups leaf content (paragraphs and fields). */
-export interface ClauseNode {
+export type ClauseNode = {
   id: string
   type: 'clause'
   title: string
@@ -26,7 +26,7 @@ export interface ClauseNode {
 }
 
 /** Top-level or nested grouping of clauses and sub-sections. */
-export interface SectionNode {
+export type SectionNode = {
   id: string
   type: 'section'
   title: string
@@ -40,7 +40,7 @@ export type DocumentNode = SectionNode | ClauseNode | ParagraphNode | FieldNode
 export type DocumentNodeType = DocumentNode['type']
 
 /** One snapshot of a document, as stored in `mocks/v*.json`. */
-export interface DocumentVersion {
+export type DocumentVersion = {
   id: string
   version: number
   title: string
